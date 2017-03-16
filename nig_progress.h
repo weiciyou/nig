@@ -13,10 +13,10 @@
 #include "nig_config.h"
 
 typedef struct {
-    char chr;		/*提示字符*/
-    char *title;	/*提示字符串*/
-    int style;		/*进步的风格*/
-    int max;		/*最大值*/
+    char chr;        /*提示字符*/
+    char *title;    /*提示字符串*/
+    int style;        /*进步的风格*/
+    int max;        /*最大值*/
     float offset;
     char *pro;
 } progress_t;
@@ -31,4 +31,4 @@ NIG_API void progress_show(progress_t *, float);
 
 NIG_API void progress_destroy(progress_t *);
 
-#endif	/*ifndef*/
+#endif    /*ifndef*/

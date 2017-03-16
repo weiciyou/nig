@@ -13,14 +13,14 @@
  * fastcgi协议报头
  */
 typedef struct {
-	unsigned char version;          // 版本
-	unsigned char type;             // 协议记录类型
-	unsigned char requestIdB1;      // 请求ID
-	unsigned char requestIdB0;
-	unsigned char contentLengthB1;  // 内容长度
-	unsigned char contentLengthB0;
-	unsigned char paddingLength;    // 填充字节长度
-	unsigned char reserved;         // 保留字节
+    unsigned char version;          // 版本
+    unsigned char type;             // 协议记录类型
+    unsigned char requestIdB1;      // 请求ID
+    unsigned char requestIdB0;
+    unsigned char contentLengthB1;  // 内容长度
+    unsigned char contentLengthB0;
+    unsigned char paddingLength;    // 填充字节长度
+    unsigned char reserved;         // 保留字节
 } FCGI_Header;
 
 #define FCGI_HEADER_LEN     8       // 协议包头长度
@@ -41,18 +41,18 @@ typedef struct {
  * 请求开始记录的协议体
  */
 typedef struct {
-	unsigned char roleB1;   // web服务器期望php-fpm扮演的角色
-	unsigned char roleB0;
-	unsigned char flags;    // 控制连接响应后是否立即关闭
-	unsigned char reserved[5];
+    unsigned char roleB1;   // web服务器期望php-fpm扮演的角色
+    unsigned char roleB0;
+    unsigned char flags;    // 控制连接响应后是否立即关闭
+    unsigned char reserved[5];
 } FCGI_BeginRequestBody;
 
 /*
  * 开始请求记录结构，包含开始请求协议头和协议体
  */
 typedef struct {
-	FCGI_Header header;
-	FCGI_BeginRequestBody body;
+    FCGI_Header header;
+    FCGI_BeginRequestBody body;
 } FCGI_BeginRequestRecord;
 
 /*
@@ -94,26 +94,26 @@ typedef struct {
 } FCGI_EndRequestRecord;
 
 typedef struct {
-	FCGI_Header header;
-	unsigned char nameLength;
-	unsigned char valueLength;
-	unsigned char data[0];
+    FCGI_Header header;
+    unsigned char nameLength;
+    unsigned char valueLength;
+    unsigned char data[0];
 } FCGI_ParamsRecord;
 
 /*
  * 构造协议记录头部
  */
 FCGI_Header makeHeader(
-		int type,
-		int requestId,
-		int contentLength,
-		int paddingLength);
+        int type,
+        int requestId,
+        int contentLength,
+        int paddingLength);
 
 /*
  * 构造开始请求记录协议体
  */
 FCGI_BeginRequestBody makeBeginRequestBody(
-		int role,
+        int role,
         int keepConn);
 
 // 发送协议记录函数指针

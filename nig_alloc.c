@@ -20,7 +20,7 @@ nig_alloc(size_t size)
     void  *p;
     p = malloc(size);
     if (p == NULL) {
-    	LOGS("malloc(%uz) failed", size);
+        LOGS("malloc(%uz) failed", size);
     }
     return p;
 }
@@ -32,7 +32,7 @@ nig_calloc(size_t num, size_t size)
     p = calloc(num, size);
     //calloc() 在动态分配完内存后，自动初始化该内存空间为零，而 malloc() 不初始化，里边数据是未知的垃圾数据
     if (p == NULL) {
-    	LOGS("malloc(%uz) failed", size);
+        LOGS("malloc(%uz) failed", size);
     }
     return p;
 }

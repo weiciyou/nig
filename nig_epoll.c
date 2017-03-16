@@ -96,20 +96,20 @@ int epoll_socket_client(const char * fastcgi_host, int fastcgi_port)
 
 
 NIG_API  int epoll_create_event(int flag) {
-	int epfd = -1;
-	epfd = epoll_create1(flag);
-	if(epfd == -1) {
-		perror("epoll_create1");
-		return -1;
-	}
+    int epfd = -1;
+    epfd = epoll_create1(flag);
+    if(epfd == -1) {
+        perror("epoll_create1");
+        return -1;
+    }
 
-	evlist = (struct epoll_event*)malloc(1024 * sizeof(struct epoll_event));
-	if(evlist == NULL) {
-		perror("malloc");
-		return -1;
-	}
+    evlist = (struct epoll_event*)malloc(1024 * sizeof(struct epoll_event));
+    if(evlist == NULL) {
+        perror("malloc");
+        return -1;
+    }
 
-	return epfd;
+    return epfd;
 }
 
 /**
@@ -131,14 +131,14 @@ NIG_API void epoll_add_event(http_ret * ret, int state)
     //ev.data.fd = listenfd;
     ev.events = state;
 
-	int s = -1;
-	s = epoll_ctl(ret->epollfd, EPOLL_CTL_ADD, ret->fd, &ev);
-	if(s == -1) {
-		perror("http_epoll_add");
-		return ;
-	}
-	epoll_setnonblocking(ret->fd);
-	return ;
+    int s = -1;
+    s = epoll_ctl(ret->epollfd, EPOLL_CTL_ADD, ret->fd, &ev);
+    if(s == -1) {
+        perror("http_epoll_add");
+        return ;
+    }
+    epoll_setnonblocking(ret->fd);
+    return ;
 }
 
 
@@ -149,13 +149,13 @@ NIG_API  void epoll_update_event(http_ret * ret, int state)
     //ev.data.fd = listenfd;
     ev.events = state;
 
-	int s = -1;
-	s = epoll_ctl(ret->epollfd, EPOLL_CTL_MOD, ret->fd, &ev);
-	if(s == -1) {
-		perror("http_epoll_mod");
-		return ;
-	}
-	return ;
+    int s = -1;
+    s = epoll_ctl(ret->epollfd, EPOLL_CTL_MOD, ret->fd, &ev);
+    if(s == -1) {
+        perror("http_epoll_mod");
+        return ;
+    }
+    return ;
 }
 
 
@@ -166,13 +166,13 @@ NIG_API  void epoll_delete_event(http_ret * ret, int state)
     //ev.data.fd = listenfd;
     ev.events = state;
 
-	int s = -1;
-	s = epoll_ctl(ret->epollfd, EPOLL_CTL_DEL, ret->fd, &ev);
-	if(s == -1) {
-		perror("http_epoll_del");
-		return ;
-	}
+    int s = -1;
+    s = epoll_ctl(ret->epollfd, EPOLL_CTL_DEL, ret->fd, &ev);
+    if(s == -1) {
+        perror("http_epoll_del");
+        return ;
+    }
 
-	return ;
+    return ;
 }
 

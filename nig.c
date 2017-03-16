@@ -15,9 +15,9 @@
 
 /* 存储配置参数 */
 struct httpd_conf {
-	char ip[16];
+    char ip[16];
     int port;
-	char fastcgi_ip[16];
+    char fastcgi_ip[16];
     int fastcgi_port;
     int thread_num;
     int job_max_num;
@@ -237,11 +237,11 @@ int send_fastcgi(http_t * t, http_ret * ret, int cgi_sock)
     for (i = 0; i < l; i++)
     {
         // params参数的值不为空才发送
-    	if (strlen((char *)(((int)ret) + paoffset[i])) > 0)
-    	{
+        if (strlen((char *)(((int)ret) + paoffset[i])) > 0)
+        {
             if (sendParamsRecord(http_writen, cgi_sock, requestId, paname[i], strlen(paname[i]),
-            		(char *)(((int)ret) + paoffset[i]),  strlen((char *)(((int)ret) + paoffset[i]))
-            		) < 0)
+                    (char *)(((int)ret) + paoffset[i]),  strlen((char *)(((int)ret) + paoffset[i]))
+                    ) < 0)
             {
                 //error_log("sendParamsRecord error", DEBUGARGS);
                 return -1;
@@ -310,7 +310,7 @@ ssize_t send_to_cli(int fd, int outlen, char *out, int errlen, char *err, FCGI_E
 
     if (outlen > 0)
     {
-    	//LOGS("---> %s <--" , out);
+        //LOGS("---> %s <--" , out);
         p = index(out, '\n');
         //LOGS("---> %s %s <--" , "77777777",p);
         n = (int)(p - out);
@@ -409,7 +409,7 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
     // 只接收GET和POST请求
     if (strcasecmp(ret->method, "GET") && strcasecmp(ret->method, "POST"))
     {
-    	 epoll_delete_event(ret, EPOLLIN);
+         epoll_delete_event(ret, EPOLLIN);
         //http_unimplemented(fd);
         return ;
     }
@@ -532,8 +532,8 @@ int run(struct httpd_conf * conf)
                 //表示对应的文件描述符可以读
                 if (evlist[i].events & EPOLLIN)
                 {
-                	 accept_request(evlist[i].data.ptr, conf);
-                	 free(evlist[i].data.ptr);
+                     accept_request(evlist[i].data.ptr, conf);
+                     free(evlist[i].data.ptr);
                 }
                 else if(evlist[i].events & (EPOLLHUP | EPOLLERR))
                 {
@@ -550,8 +550,8 @@ int run(struct httpd_conf * conf)
 
 int main(int argc, char *argv[])
 {
-	init_progress(); /*启动进度条*/
-	struct httpd_conf conf;
+    init_progress(); /*启动进度条*/
+    struct httpd_conf conf;
     memset(&conf, 0, sizeof(struct httpd_conf));
     init_help(argc, argv, &conf);/*命令行参数初始化*/
 

@@ -131,7 +131,7 @@ ssize_t http_writen(int fd, void *usrbuf, size_t n)
  */
 void http_readinitb(http_t *rp, int fd)
 {
-	//memset(rp, 0, sizeof(http_t));
+    //memset(rp, 0, sizeof(http_t));
     rp->nig_fd = fd;
     rp->nig_cnt = 0;
     rp->nig_bufptr = rp->nig_buf;
