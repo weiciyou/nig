@@ -45,8 +45,6 @@ typedef char *                         nig_char_t;
 //判断是否为空
 #define ISspace(x) isspace((int)(x))
 
-
-
 #define MAXLINE 8192 // 最大行长度
 
-#endif /* _NIG_H_CONFIG_ */
+#endif /* end _NIG_H_CONFIG_ */

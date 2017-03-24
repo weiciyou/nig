@@ -45,7 +45,9 @@ int sendBeginRequestRecord(write_record wr, int fd, int requestId)
     // 构造一个FCGI_BeginRequestRecord结构
     FCGI_BeginRequestRecord beginRecord;
 
+    //构造协议记录头部，返回FCGI_Header结构体
     beginRecord.header = makeHeader(FCGI_BEGIN_REQUEST, requestId, sizeof(beginRecord.body), 0);
+
     beginRecord.body = makeBeginRequestBody(FCGI_RESPONDER, 0);
 
     ret = wr(fd, &beginRecord, sizeof(beginRecord));
@@ -140,12 +142,7 @@ int sendEmptyParamsRecord(write_record wr, int fd, int requestId)
  * 发送成功返回0
  * 出错返回-1
  */
-int sendStdinRecord(
-        write_record wr,
-        int fd,
-        int requestId,
-        char *data,
-        int len)
+int sendStdinRecord(write_record wr, int fd, int requestId, char *data, int len)
 {
     int cl = len, pl, ret;
     char buf[8] = {0};
@@ -161,10 +158,11 @@ int sendStdinRecord(
 
         FCGI_Header sinHeader = makeHeader(FCGI_STDIN, requestId, cl, pl);
         ret = wr(fd, (char *)&sinHeader, FCGI_HEADER_LEN);  // 发送协议头部
-        if (ret != FCGI_HEADER_LEN) {
+        if (ret != FCGI_HEADER_LEN)
+        {
             return -1;
         }
-
+        LOGS("@@@@-----> %s   %d <-----", data, cl);
         ret = wr(fd, data, cl); // 发送stdin数据
         if (ret != cl) {
             return -1;

@@ -8,43 +8,6 @@
 
 #include "nig_http.h"
 
-
-/*
- * 系统调用read函数的包装函数
- * 相对于read，增加了内部缓冲区
- */
- ssize_t http_read(http_t *rp, char *usrbuf, size_t n)
-{
-    int cnt;
-    // 内部缓冲区为空，从缓冲区对应的描述符中继续读取字节填满内部缓冲区
-    while (rp->nig_cnt <= 0)
-    {
-        rp->nig_cnt = read(rp->nig_fd, rp->nig_buf, sizeof(rp->nig_buf));
-
-        if (rp->nig_cnt < 0)
-        { // 返回-1
-            if (errno != EINTR) {
-                return -1;
-            }
-        } else if (rp->nig_cnt == 0) { // EOF
-            return 0;
-        } else {
-            rp->nig_bufptr = rp->nig_buf;
-        }
-    }
-
-
-    // 比较调用所需的字节数n与内部缓冲区可读字节数rp->nig_cnt
-    // 取其中最小值
-    cnt = n;
-    if (rp->nig_cnt < n) {
-        cnt = rp->nig_cnt;
-    }
-    memcpy(usrbuf, rp->nig_bufptr, cnt);
-    rp->nig_bufptr += cnt;
-    rp->nig_cnt -= cnt;
-    return cnt;
-}
  /*
   * 从描述符fd中读取n个字节到存储器位置usrbuf
   */
@@ -70,34 +33,6 @@
 
      return (n - nleft); // 返回已经读取的字节数
  }
- /*
-  * 从文件rp中读取n字节数据到usrbuf
-  */
- ssize_t http_readnb(http_t *rp, void *usrbuf, size_t n)
- {
-     size_t nleft = n; // 剩下的未读取字节数
-     ssize_t nread;
-     char *bufp = usrbuf;
-
-     while (nleft > 0) {
-         if ((nread = http_read(rp, bufp, nleft)) < 0) {
-             if(errno == EINTR) { // 被信号处理程序中断返回
-                 nread = 0;
-             } else {
-                 return -1; // 读取数据出错
-             }
-         } else if(nread == 0) { // EOF
-             break;
-         }
-         nleft -= nread;
-         bufp += nread;
-     }
-
-     return (n - nleft);
- }
-
-
-
 
 /*
  * 将usrbuf缓冲区中的前n个字节数据写入fd中
@@ -109,11 +44,17 @@ ssize_t http_writen(int fd, void *usrbuf, size_t n)
     ssize_t nwritten;
     char *bufp = (char *)usrbuf;
 
-    while (nleft > 0) {
-        if ((nwritten = write(fd, bufp, nleft)) <= 0) {
-            if (errno == EINTR) { // 被信号处理函数中断返回
+    while (nleft > 0)
+    {
+        if ((nwritten = write(fd, bufp, nleft)) <= 0)
+        {
+        	// 被信号处理函数中断返回
+            if (errno == EINTR)
+            {
                 nwritten = 0;
-            } else { // write函数出错
+            }
+            else
+            { // write函数出错
                 return -1;
             }
         }
@@ -124,94 +65,88 @@ ssize_t http_writen(int fd, void *usrbuf, size_t n)
     return n;
 }
 
+ ssize_t http_get_line_t(int sock, char *buf, int size)
+ {
+	 int i = 0;
+	 char c = '\0';
+	 int n;
+	 while ((i < size - 1) && (c != '\n'))
+	 {
+		 //读一个字节的数据存放在 c 中
+		 n = recv(sock, &c, 1, 0);
 
+		 if (n > 0) {
+			 if (c == '\r') {
+			 	 n = recv(sock, &c, 1, MSG_PEEK);
+			 	 if ((n > 0) && (c == '\n')) {
+			 		 recv(sock, &c, 1, 0);
+			 	 }else {
+			 		 c = '\n';
+			 	 }
+			 }
 
-/*
- * 初始化内部缓冲区rio_t结构
- */
-void http_readinitb(http_t *rp, int fd)
-{
-    //memset(rp, 0, sizeof(http_t));
-    rp->nig_fd = fd;
-    rp->nig_cnt = 0;
-    rp->nig_bufptr = rp->nig_buf;
-    return ;
+			 buf[i] = c;
+			 i++;
+		 } else {
+			 c = '\n';
+		 }
+	 }
+	 buf[i] = '\0';
+	 return i;
 }
 
-
-/*
- * 从文件rp中读取一行数据（包括结尾的换行符），拷贝到usrbuf
- * 并用0字符来结束这行数据
- */
-ssize_t http_get_line(http_t *t, void *usrbuf, size_t maxlen)
-{
-    int n;
-    int rc;
-    char c;
-    char * bufp = usrbuf;
-    //write_log(("/data/cluster/web/src/node/c/nig/123.log") , "%s \r\n", "--99999");
-
-    for (n = 1; n < maxlen; n++) //循环2048次
-    {
-        if ((rc = http_read(t, &c, 1)) == 1) {
-            *bufp++ = c;
-            if (c == '\n') { // 读完了一行
-                break;
-            }
-        } else if (rc == 0) {
-            if (n == 1) {
-                return 0; // EOF,但没有读取任何数据
-            } else {
-                break; //EOF,但已经读取了一些数据
-            }
-        } else { // 出错
-            return -1;
-        }
-    }
-
-    *bufp = 0;
-    return n;
-}
-
-
-void http_get_headers(http_t *rp, http_ret *ret)
+void http_get_headers(int fd, http_ret *ret)
 {
     char buf[MAXLINE];
     char *start;
     char *end;
 
-    memset(buf, 0, sizeof(buf));
-    if (http_get_line(rp, buf, MAXLINE) < 0) {
-        //error_log("http_get_line error", DEBUGARGS);
-    }
+	memset(buf, 0, sizeof(buf));
+	if (http_get_line_t(fd, &buf[0], sizeof(buf)) < 0)
+	{
+		 perror("do_read 函数错误");
+	}
+	LOGS("请求第2行---> %s <--" , buf);
 
-    while (strcmp(buf, "\r\n")) {
-        start = index(buf, ':');
-        // 每行数据包含\r\n字符，需要删除
-        end = index(buf, '\r');
 
-        if (start != 0 && end != 0) {
-            *end = '\0';
-            while ((*(start + 1)) == ' ') {
-                start++;
-            }
+	 while(buf[0] && strlen(buf) > 0)
+     {
+		start = index(buf, ':');
+		// 每行数据包含\r\n字符，需要删除
+		end = index(buf, '\n');
 
-            if (is_contype(buf)) {
-                strcpy(ret->contype, start + 1);
-            } else if (is_conlength(buf)) {
-                strcpy(ret->conlength, start + 1);
-            }
-        }
+		if (start != 0 && end != 0) {
+			*end = '\0';
+			while ((*(start + 1)) == ' ') {
+				start++;
+			}
 
-        memset(buf, 0, 2048);
-        if (http_get_line(rp, buf, MAXLINE) < 0) {
-            //error_log("http_get_line error", DEBUGARGS);
-        }
+			if (is_contype(buf))
+			{
+				strcpy(ret->contype, start + 1);
+			}
+			if (is_conlength(buf))
+			{
+				strcpy(ret->conlength, start + 1);
+			}
+		}
+
+		if ((start ==0) && (strlen(buf) >= 3))  //post内容
+		{
+			ret->args_post = (char*)malloc(sizeof(buf));
+			strcpy(ret->args_post, buf);
+		}
+
+		memset(buf, 0, sizeof(buf));
+		if (http_get_line_t(fd, &buf[0], sizeof(buf)) < 0)
+		{
+			 perror("do_read 函数错误");
+		}
+		LOGS("请求第3行---> %s <--" , buf);
     }
 
     return ;
 }
-
 
 
 /*
@@ -282,21 +217,8 @@ void http_send_headers(int client)
      send(client, buf, strlen(buf), 0);
      //strcpy(buf, "\r\n");
      //send(client, buf, strlen(buf), 0);
+     return ;
 }
-
-
-void http_cat(int client, FILE *resource)
-{
-     char buf[1024];
-     //从文件文件描述符中读取指定内容
-     fgets(buf, sizeof(buf), resource);
-     while (!feof(resource))
-     {
-          send(client, buf, strlen(buf), 0);
-          fgets(buf, sizeof(buf), resource);
-     }
-}
-
 
 void http_unimplemented(int client)
 {
@@ -319,8 +241,6 @@ void http_unimplemented(int client)
      send(client, buf, strlen(buf), 0);
 }
 
-
-
 void http_not_found(int client)
 {
      char buf[1024];
@@ -334,21 +254,6 @@ void http_not_found(int client)
      send(client, buf, strlen(buf), 0);
      sprintf(buf, "<HTML><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><TITLE>Not Found</TITLE></head>\r\n");
      send(client, buf, strlen(buf), 0);
-     sprintf(buf, "<BODY><P>没有找到文件\r\n");
+     sprintf(buf, "<BODY><P>没有找到文件</BODY></HTML>\r\n");
      send(client, buf, strlen(buf), 0);
-     sprintf(buf, "your request because the resource specified\r\n");
-     send(client, buf, strlen(buf), 0);
-     sprintf(buf, "is unavailable or nonexistent.\r\n");
-     send(client, buf, strlen(buf), 0);
-     sprintf(buf, "</BODY></HTML>\r\n");
-     send(client, buf, strlen(buf), 0);
-}
-
-
-
-void http_error_die(const char *sc)
-{
-     //包含于<stdio.h>,基于当前的 errno 值，在标准错误上产生一条错误消息。参考《TLPI》P49
-     perror(sc);
-     exit(1);
 }

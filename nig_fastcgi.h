@@ -144,12 +144,7 @@ int sendEmptyParamsRecord(write_record wr, int fd, int requestId);
 /*
  * 发送FCGI_STDIN数据
  */
-int sendStdinRecord(
-        write_record wr,
-        int fd,
-        int requestId,
-        char *data,
-        int len);
+int sendStdinRecord( write_record wr, int fd, int requestId, char *data, int len);
 
 /*
  * 发送空的FCGI_STDIN记录
@@ -165,12 +160,6 @@ typedef ssize_t (*send_to_client)(int, int, char *, int, char *, FCGI_EndRequest
 /*
  * 读取php-fpm处理结果
  */
-int recvRecord(
-        read_record rr,
-        send_to_client stc,
-        int cfd,
-        int fd,
-        int requestId);
-
+int recvRecord(read_record rr, send_to_client stc, int cfd, int fd, int requestId);
 
 #endif

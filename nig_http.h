@@ -26,45 +26,25 @@ typedef struct {
     char cgiargs[256];      // 查询参数
     char contype[256];      // 请求体类型
     char conlength[16];     // 请求体长度
+    char *args_post;
 	int fd;                 //文件描述符
 	int epollfd;            //epoll 描述符
 	char remote_ip[16];     //客户端ip
     int remote_port;        //客户端端口
 } http_ret;
 
-typedef struct {
-    int nig_fd;                 // 内部缓冲区对应的描述符
-    int nig_cnt;                // 可以读取的字节数
-    char *nig_bufptr;           // 下一个可以读取的字节地址
-    char nig_buf[1024];         // 内部缓冲区
-} http_t;
-
-
-//从fd读取请求头 放入一个结构体 http_t
-ssize_t http_read(http_t *rp, char *usrbuf, size_t n);
-
 //处理fastcgi   从描述符fd中读取n个字节到存储器位置usrbuf
 ssize_t http_readn(int fd, void *usrbuf, size_t n);
-
-//处理fastcgi
-ssize_t http_readnb(http_t *rp, void *usrbuf, size_t n);
-
-
 
 //处理fastcgi   将usrbuf缓冲区中的前n个字节数据写入fd中
 ssize_t http_writen(int fd, void *usrbuf, size_t n);
 
 
-//初始化 http_t 结构体
-void http_readinitb(http_t *rp, int fd);
-
-
-
 //获取一行
-ssize_t http_get_line(http_t *t, void *usrbuf, size_t maxlen);
+ssize_t http_get_line_t(int sock, char *buf, int size);
 
 //获取请求头
-void http_get_headers(http_t *rp, http_ret *ret); // 读取请求行
+void http_get_headers(int fd, http_ret *ret); // 读取请求行
 
 //解析uri
 int http_parse_uri(char *uri, char *filename, char *name, char *cgiargs);

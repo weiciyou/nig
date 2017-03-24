@@ -53,6 +53,18 @@ struct option long_options[] = {
      {0,0,0,0}
 };
 
+static void nig_usage(void)
+{
+    fprintf(stderr,
+            "nig [option]... URL\n"
+            "  -s|--reload              重启指令.\n"
+            "  -c|--filename            指定配置文件.如: /data/nig.conf  \n"
+            "  -?|-h|--help             This information.\n"
+            "  -h|--version             Display program version.\n"
+           );
+    exit(EXIT_FAILURE);
+}
+
 /**
  * 启动命令行参数解析
  * @access public
@@ -79,7 +91,7 @@ void init_help(int argc, char **argv, struct httpd_conf * conf)
             case ':':
             case 'h':
             case '?':
-                printf("这个是帮助文件 \n");
+            	nig_usage();
                 break;
         }
     }
@@ -127,7 +139,6 @@ void init_conf(struct httpd_conf *conf)
         {
             conf->port = atoi(param_value);
         }
-
         if(strcmp(param_name, "FASTCGI_IP") == 0)
         {
             strcpy(conf->fastcgi_ip, param_value);
@@ -158,33 +169,14 @@ void init_conf(struct httpd_conf *conf)
  * @param http_ret * 结构体指针
  * @return void
  */
-void do_file(http_ret * ret)
+void nig_file(http_ret * ret)
 {
-    char buf[1024];
-    sprintf(buf, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\nHello World", 11);
-    int nwrite;
-    int data_size = strlen(buf);
-    int n = data_size;
-
-    while (n > 0)
-    {
-        nwrite = write(ret->fd, buf + data_size - n, n);
-        if (nwrite < n)
-        {
-            if (nwrite == -1 && errno != EAGAIN)
-            {
-                perror("write error");
-            }
-            //epoll_delete_event(req_ptr->epollfd, req_ptr->fd, EPOLLOUT);
-            break;
-        }
-        n -= nwrite;
-    }
+	http_send_headers(ret->fd);
+    send(ret->fd, "\r\n", strlen("\r\n"), 0);
+	send(ret->fd, "hello world", strlen("hello world"), 0);
 
     /* 写完就直接关了 不用再加入监听*/
     epoll_delete_event(ret, EPOLLOUT);
-
-    close(ret->fd);
     return ;
 }
 
@@ -197,10 +189,9 @@ void do_file(http_ret * ret)
  * @param int cgi_sock 连接cgi程序句柄
  * @return void
  */
-int send_fastcgi(http_t * t, http_ret * ret, int cgi_sock)
+int send_fastcgi(http_ret * ret, int cgi_sock)
 {
     int requestId, i, l;
-    char *buf;
 
     requestId = cgi_sock;
 
@@ -225,28 +216,27 @@ int send_fastcgi(http_t * t, http_ret * ret, int cgi_sock)
         (size_t) & (((http_ret *)0)->contype),
         (size_t) & (((http_ret *)0)->conlength)
     };
+
     // 发送开始请求记录
-    if (sendBeginRequestRecord(http_writen, cgi_sock, requestId) < 0)
-    {
-        //error_log("sendBeginRequestRecord error", DEBUGARGS);
-        return -1;
-    }
+     sendBeginRequestRecord(http_writen, cgi_sock, requestId);
 
     // 发送params参数
     l = sizeof(paoffset) / sizeof(paoffset[0]);
     for (i = 0; i < l; i++)
     {
+    	LOGS("-----> %p   %s <-----", paoffset[i],   (char *)(((int)ret) + paoffset[i]));
         // params参数的值不为空才发送
-        if (strlen((char *)(((int)ret) + paoffset[i])) > 0)
-        {
-            if (sendParamsRecord(http_writen, cgi_sock, requestId, paname[i], strlen(paname[i]),
-                    (char *)(((int)ret) + paoffset[i]),  strlen((char *)(((int)ret) + paoffset[i]))
-                    ) < 0)
+         //if (strlen((char *)((int)ret + paoffset[i])) > 0)
+         {
+            if (sendParamsRecord(http_writen, cgi_sock, requestId, paname[i],
+            		strlen(paname[i]),
+            		(char *)(((int)ret) + paoffset[i]),
+            		strlen((char *)(((int)ret) + paoffset[i]))
+             ) < 0)
             {
-                //error_log("sendParamsRecord error", DEBUGARGS);
                 return -1;
             }
-        }
+         }
     }
 
     // 发送空的params参数
@@ -259,24 +249,14 @@ int send_fastcgi(http_t * t, http_ret * ret, int cgi_sock)
     // 继续读取请求体数据
     l = atoi(ret->conlength);
     if (l > 0) { // 请求体大小大于0
-        buf = (char *)malloc(l + 1);
-        memset(buf, '\0', l);
-        if (http_readnb(t, buf, l) < 0)
-        {
-            //error_log("rio_readn error", DEBUGARGS);
-            free(buf);
-            return -1;
-        }
-
         // 发送stdin数据
-        if (sendStdinRecord(http_writen, cgi_sock, requestId, buf, l) < 0)
+        if (sendStdinRecord(http_writen, cgi_sock, requestId, ret->args_post, strlen(ret->args_post)) < 0)
         {
-            //error_log("sendStdinRecord error", DEBUGARGS);
-            free(buf);
+            free(ret->args_post);
             return -1;
         }
 
-        free(buf);
+        free(ret->args_post);
     }
 
     // 发送空的stdin数据
@@ -285,7 +265,6 @@ int send_fastcgi(http_t * t, http_ret * ret, int cgi_sock)
         //error_log("sendEmptyStdinRecord error", DEBUGARGS);
         return -1;
     }
-
     return 0;
 }
 
@@ -315,10 +294,8 @@ ssize_t send_to_cli(int fd, int outlen, char *out, int errlen, char *err, FCGI_E
         //LOGS("---> %s %s <--" , "77777777",p);
         n = (int)(p - out);
 
-        //if (http_writen(fd, p + 3, outlen - n - 3) < 0) {
         if (http_writen(fd, out , outlen) < 0)
         {
-            //error_log("rio_written error", DEBUGARGS);
             return -1;
         }
     }
@@ -339,7 +316,7 @@ ssize_t send_to_cli(int fd, int outlen, char *out, int errlen, char *err, FCGI_E
  * @param http_ret * 结构体指针
  * @return void
  */
-int recv_fastcgi(int fd, int cgi_sock)
+int read_fastcgi(int fd, int cgi_sock)
 {
     int requestId;
     requestId = cgi_sock;
@@ -362,21 +339,20 @@ int recv_fastcgi(int fd, int cgi_sock)
  * @param struct httpd_conf * conf     结构体指针
  * @return void
  */
-void do_cgi(http_ret * ret, http_t * t, struct httpd_conf * conf)
+void nig_cgi(http_ret * ret,  struct httpd_conf * conf)
 {
     int cgi_sock;
     // 创建一个连接到fastcgi服务器的套接字
     cgi_sock = epoll_socket_client(conf->fastcgi_ip, conf->fastcgi_port);
 
     // 发送http请求数据
-    send_fastcgi(t, ret, cgi_sock);
+    send_fastcgi(ret, cgi_sock);
     // 接收处理结果
-    recv_fastcgi(t->nig_fd, cgi_sock);
+    read_fastcgi(ret->fd, cgi_sock);
 
     /* 写完就直接关了 不用再加入监听*/
     epoll_delete_event(ret, EPOLLOUT);
 
-    close(ret->fd);
     close(cgi_sock); // 关闭与fastcgi服务器连接的套接字
 }
 
@@ -395,36 +371,34 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
     int is_cgi;
     char buf[MAXLINE];
     struct stat sbuf; /*文件属性 判断文件权限*/
-    http_t * t = (http_t *)malloc(sizeof(http_t));
 
-    http_readinitb(t, fd);
-    if (http_get_line(t, buf, MAXLINE) < 0)
+    if (http_get_line_t(fd, &buf[0], sizeof(buf)) < 0)
     {
          epoll_delete_event(ret, EPOLLIN);
          perror("do_read 函数错误");
     }
+    LOGS("请求第1行---> %s <--" , buf);
     // 提取请求方法、请求URI、HTTP版本
     sscanf(buf, "%s %s %s", ret->method, ret->uri, ret->version);
 
     // 只接收GET和POST请求
     if (strcasecmp(ret->method, "GET") && strcasecmp(ret->method, "POST"))
     {
-         epoll_delete_event(ret, EPOLLIN);
-        //http_unimplemented(fd);
+        epoll_delete_event(ret, EPOLLIN);
+        http_unimplemented(fd);
         return ;
     }
-    http_get_headers(t, ret);
+
+    http_get_headers(fd, ret);
     // 分析请求uri，获得具体请求文件名和请求参数
     is_cgi = http_parse_uri(ret->uri, ret->filename, ret->name, ret->cgiargs);
 
-    /*
     // 判断请求文件是否存在
     if (stat(ret->filename, &sbuf) < 0) {
-         ////epoll_delete_event(ret->epollfd, fd, EPOLLIN);
+    	epoll_delete_event(ret, EPOLLIN);
         http_not_found(fd);
         return ;
     }
-    */
 
     epoll_update_event(ret, EPOLLOUT);
 
@@ -447,7 +421,7 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
                return ;
            }
          */
-        do_file(ret);
+        nig_file(ret);
     }
     else
     {
@@ -459,11 +433,10 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
                return ;
            }
         */
-        do_cgi(ret, t, conf);
+        nig_cgi(ret, conf);
     }
 
-    free(t);
-    close(fd);
+    close(ret->fd);
     return  ;
 }
 
@@ -550,14 +523,13 @@ int run(struct httpd_conf * conf)
 
 int main(int argc, char *argv[])
 {
-    init_progress(); /*启动进度条*/
     struct httpd_conf conf;
-    memset(&conf, 0, sizeof(struct httpd_conf));
+    memset(&conf,0, sizeof(struct httpd_conf));
     init_help(argc, argv, &conf);/*命令行参数初始化*/
+    init_progress();             /*启动进度条*/
+    init_conf(&conf);            /*读取解析配置文件*/
 
-    init_conf(&conf);
-
-    run(&conf);
+    run(&conf);                  /*启动*/
     return 1;
 }
 

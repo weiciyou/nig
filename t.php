@@ -15,43 +15,41 @@ printf("%d\r",550);
 
 echo "\n", "Done.\n";
 
+4位不重复 不有规律
 
+
+echo uniqid ('php_', true); 
+echo "\r\n";
+
+$onlyid=base_convert($all,10,36);
 */
-echo 'hello world';
-echo "\r\n ";
+ print_r($_SERVER);
 
-print_r($_SERVER);
-print_r($_REQUEST);
+ print_r($_GET);
+ 
+
+ print_r($_POST);
+echo rand();
 
 exit();
-$array=array(
- 0=>array (
-        '_index'=>'speedpos',
-        '_source'=>array('order_no'=> 123, 'type'=>'order')
-     ),
- 1=>array (
-        '_index'=>'speedpos',
-        '_source'=>array('order_no'=> 456, 'type'=>'order')
-    ),
- 2=>array (
-        '_index'=>'speedpos',
-        '_source'=>array('order_no'=> 789, 'type'=>'order')
-    ),
- 
-);
-$res = array_column($array, '_source');
-print_r($res);
-
-
-
-
-echo json_encode([
-              'query' => [
-                  'bool' => [
-                      'must_not' => [
-                          ['terms' => ['order_status' => ['1','2']]]
-                      ],
-                      'must' => []
-                  ]
-              ]
-        ]);
+function fun()
+{
+    for ($b=0; $b<3000000; $b++)
+    {
+        echo   base_convert($b, 10, 36);
+        //  echo str_pad($n, 10, '0', STR_PAD_RIGHT); 
+        echo "\r\n";
+    }
+    
+    /*
+    $res = array_count_values($arr);
+    foreach ($res as $k => $v)
+    {
+        if ($v > 1)
+        {
+            echo $k . "\r\n";
+        } 
+        echo $v;
+    }*/
+}
+fun();
