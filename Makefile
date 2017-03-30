@@ -2,10 +2,10 @@ CC=gcc
 
 target=nig
 
-obj=nig.o  nig_alloc.o nig_string.o nig_progress.o nig_http.o nig_epoll.o nig_fastcgi.o   
+obj=nig.o nig_alloc.o nig_string.o nig_progress.o nig_http.o nig_epoll.o nig_fastcgi.o nig_thrpool.o   
 
 $(target):$(obj)
-	$(CC) $(obj) -Wall -o $(target)
+	$(CC) $(obj) -pthread -Wall -o $(target)
 
 nig.o:nig.c
 	$(CC) -g -c nig_header.h nig_config.h nig.c 
@@ -27,6 +27,9 @@ nig_epoll.o:nig_epoll.c
 	
 nig_fastcgi.o:nig_fastcgi.c
 	$(CC) -g -c nig_fastcgi.h nig_fastcgi.c
+	
+nig_thrpool.o:nig_thrpool.c
+	$(CC) -g -c -pthread nig_thrpool.h nig_thrpool.c
 	
 .PHONY:clean
 

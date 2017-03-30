@@ -162,7 +162,7 @@ int sendStdinRecord(write_record wr, int fd, int requestId, char *data, int len)
         {
             return -1;
         }
-        LOGS("@@@@-----> %s   %d <-----", data, cl);
+        //LOGS("@@@@-----> %s   %d <-----", data, cl);
         ret = wr(fd, data, cl); // 发送stdin数据
         if (ret != cl) {
             return -1;

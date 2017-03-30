@@ -106,7 +106,7 @@ void http_get_headers(int fd, http_ret *ret)
 	{
 		 perror("do_read 函数错误");
 	}
-	LOGS("请求第2行---> %s <--" , buf);
+	//LOGS("请求第2行---> %s <--" , buf);
 
 
 	 while(buf[0] && strlen(buf) > 0)
@@ -142,7 +142,7 @@ void http_get_headers(int fd, http_ret *ret)
 		{
 			 perror("do_read 函数错误");
 		}
-		LOGS("请求第3行---> %s <--" , buf);
+		//LOGS("请求第3行---> %s <--" , buf);
     }
 
     return ;

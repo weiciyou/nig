@@ -12,6 +12,7 @@
 #include "nig_http.h"
 #include "nig_epoll.h"
 #include "nig_fastcgi.h"
+#include "nig_thrpool.h"
 
 /* 存储配置参数 */
 struct httpd_conf {
@@ -23,6 +24,7 @@ struct httpd_conf {
     int job_max_num;
     char filename[255]; /* configuration file */
 };
+struct httpd_conf conf;
 
 /**
  * 启动进度条
@@ -174,7 +176,7 @@ void nig_file(http_ret * ret)
 	http_send_headers(ret->fd);
     send(ret->fd, "\r\n", strlen("\r\n"), 0);
 	send(ret->fd, "hello world", strlen("hello world"), 0);
-
+	//LOGS("断点错误 ---> %d <--" , 2);
     /* 写完就直接关了 不用再加入监听*/
     epoll_delete_event(ret, EPOLLOUT);
     return ;
@@ -224,7 +226,7 @@ int send_fastcgi(http_ret * ret, int cgi_sock)
     l = sizeof(paoffset) / sizeof(paoffset[0]);
     for (i = 0; i < l; i++)
     {
-    	LOGS("-----> %p   %s <-----", paoffset[i],   (char *)(((int)ret) + paoffset[i]));
+    	//LOGS("-----> %p   %s <-----", paoffset[i],   (char *)(((int)ret) + paoffset[i]));
         // params参数的值不为空才发送
          //if (strlen((char *)((int)ret + paoffset[i])) > 0)
          {
@@ -339,17 +341,18 @@ int read_fastcgi(int fd, int cgi_sock)
  * @param struct httpd_conf * conf     结构体指针
  * @return void
  */
-void nig_cgi(http_ret * ret,  struct httpd_conf * conf)
+void nig_cgi(http_ret * ret)
 {
     int cgi_sock;
     // 创建一个连接到fastcgi服务器的套接字
-    cgi_sock = epoll_socket_client(conf->fastcgi_ip, conf->fastcgi_port);
+    cgi_sock = epoll_socket_client(conf.fastcgi_ip, conf.fastcgi_port);
 
     // 发送http请求数据
     send_fastcgi(ret, cgi_sock);
     // 接收处理结果
     read_fastcgi(ret->fd, cgi_sock);
 
+    LOGS("断点错误 ---> %d <--" , 4);
     /* 写完就直接关了 不用再加入监听*/
     epoll_delete_event(ret, EPOLLOUT);
 
@@ -363,7 +366,7 @@ void nig_cgi(http_ret * ret,  struct httpd_conf * conf)
  * @param struct httpd_conf * conf     结构体指针
  * @return void
  */
-void accept_request(void *req_ptr, struct httpd_conf * conf)
+static int accept_request(void *req_ptr)
 {
     struct epoll_event ev;
     http_ret * ret = (http_ret *)req_ptr;
@@ -374,19 +377,21 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
 
     if (http_get_line_t(fd, &buf[0], sizeof(buf)) < 0)
     {
+    	 LOGS("断点错误 ---> %d <--" , 5);
          epoll_delete_event(ret, EPOLLIN);
          perror("do_read 函数错误");
     }
-    LOGS("请求第1行---> %s <--" , buf);
+    //LOGS("请求第1行---> %s <--" , buf);
     // 提取请求方法、请求URI、HTTP版本
     sscanf(buf, "%s %s %s", ret->method, ret->uri, ret->version);
 
     // 只接收GET和POST请求
     if (strcasecmp(ret->method, "GET") && strcasecmp(ret->method, "POST"))
     {
+    	LOGS("断点错误 ---> %d <--" , 6);
         epoll_delete_event(ret, EPOLLIN);
-        http_unimplemented(fd);
-        return ;
+        http_not_found(fd);
+        return 0;
     }
 
     http_get_headers(fd, ret);
@@ -395,9 +400,10 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
 
     // 判断请求文件是否存在
     if (stat(ret->filename, &sbuf) < 0) {
+    	LOGS("断点错误 ---> %d <--" , 1);
     	epoll_delete_event(ret, EPOLLIN);
         http_not_found(fd);
-        return ;
+        return 0;
     }
 
     epoll_update_event(ret, EPOLLOUT);
@@ -433,11 +439,12 @@ void accept_request(void *req_ptr, struct httpd_conf * conf)
                return ;
            }
         */
-        nig_cgi(ret, conf);
+        nig_cgi(ret);
     }
 
     close(ret->fd);
-    return  ;
+    free(ret);
+    return  0;
 }
 
 /**
@@ -468,6 +475,7 @@ int run(struct httpd_conf * conf)
 
     int  event_num; /**事件个数**/
     int i;
+	void * pool;
     while(1)
     {
         event_num = epoll_wait(epollfd, evlist, 128, -1);
@@ -476,7 +484,16 @@ int run(struct httpd_conf * conf)
             perror("epoll_pwait");
             exit(EXIT_FAILURE);
         }
-
+        //////////////多线程 start////////////
+        if (event_num > 0 )
+        {
+        	pool = thrpool_create(event_num);
+        }
+        else
+        {
+        	continue;
+        }
+        //////////////多线程 end ////////////
         for (i = 0; i < event_num; ++i)
         {
            // fd = evlist[i].data.fd;
@@ -505,8 +522,11 @@ int run(struct httpd_conf * conf)
                 //表示对应的文件描述符可以读
                 if (evlist[i].events & EPOLLIN)
                 {
-                     accept_request(evlist[i].data.ptr, conf);
-                     free(evlist[i].data.ptr);
+                	//////////////多线程 start////////////
+            		 thrpool_add_task(pool, accept_request, (void *)evlist[i].data.ptr);
+            		 //////////////多线程 end ////////////
+
+                     //accept_request(evlist[i].data.ptr, conf);
                 }
                 else if(evlist[i].events & (EPOLLHUP | EPOLLERR))
                 {
@@ -514,6 +534,8 @@ int run(struct httpd_conf * conf)
                 }
             }
         }
+    	thrpool_wait(pool);
+    	thrpool_destroy(pool, 0);
     }
 
     free(request);
@@ -523,7 +545,6 @@ int run(struct httpd_conf * conf)
 
 int main(int argc, char *argv[])
 {
-    struct httpd_conf conf;
     memset(&conf,0, sizeof(struct httpd_conf));
     init_help(argc, argv, &conf);/*命令行参数初始化*/
     init_progress();             /*启动进度条*/

@@ -29,7 +29,6 @@
 #include <time.h>
 
 
-#include <pthread.h>
 
 
 
